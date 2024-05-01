@@ -1,6 +1,7 @@
 import numpy as np
 from typing import Union
 
+np.random.seed(42)
 
 def softmax(x):
     exp_x = np.exp(x - np.max(x, axis=-1, keepdims=True))
@@ -10,7 +11,7 @@ def softmax(x):
 class SelfAttention():
 
     def __init__(self, d_in, d_out):
-        #np.random.seed(42)
+
         self.d_out = d_out
         self.W_query = np.random.rand(d_in, d_out)
         self.W_key   = np.random.rand(d_in, d_out)
