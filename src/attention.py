@@ -18,7 +18,7 @@ def softmax(x):
 # SelfAttention, CausalAttention, Multihead Attention
 #__________________________________________________________________________
 
-class SelfAttention_np():
+class SelfAttentionNp():
 
     def __init__(self, d_in, d_out):
 
@@ -45,7 +45,7 @@ class SelfAttention_np():
         return context_vec
 
 
-class CausalAttention_np:
+class CausalAttentionNp:
 
     def __init__(self, d_in, d_out, context_length, dropout):
         self.d_out = d_out
@@ -68,7 +68,19 @@ class CausalAttention_np:
         context_vecs = np.matmul(attn_weights, values)
         return context_vecs
 
-class MultiHeadAttention_np:
+
+class MultiHeadAttentionWrapperNp:
+    def __init__(self, d_in, d_out, context_length, dropout, num_heads, qkv_bias=False):
+        self.heads = [CausalAttention(d_in, d_out, context_length, dropout, qkv_bias) 
+                      for _ in range(num_heads)]
+        self.out_proj = np.random.randn(d_out*num_heads, d_out*num_heads)  # Assuming weights are initialized randomly
+
+    def forward(self, x):
+        context_vec = np.concatenate([head(x) for head in self.heads], axis=-1)
+        return np.dot(context_vec, self.out_proj)
+
+
+class MultiHeadAttentionNp:
     def __init__(self, d_in, d_out, context_length, dropout, num_heads, qkv_bias=False):
         assert d_out % num_heads == 0, "d_out must be divisible by num_heads"
 
@@ -153,6 +165,21 @@ class CausalAttention(nn.Module):
         return context_vec
 
 
+class MultiHeadAttentionWrapper(nn.Module):
+
+    def __init__(self, d_in, d_out, context_length, dropout, num_heads, qkv_bias=False):
+        super().__init__()
+        self.heads = nn.ModuleList(
+            [CausalAttention(d_in, d_out, context_length, dropout, qkv_bias)
+             for _ in range(num_heads)]
+        )
+        self.out_proj = nn.Linear(d_out*num_heads, d_out*num_heads)
+
+    def forward(self, x):
+        context_vec = torch.cat([head(x) for head in self.heads], dim=-1)
+        return self.out_proj(context_vec)
+        
+
 class MultiHeadAttention(nn.Module):
     def __init__(self, d_in, d_out, context_length, dropout, num_heads, qkv_bias=False):
         super().__init__()
@@ -207,3 +234,44 @@ class MultiHeadAttention(nn.Module):
         context_vec = self.out_proj(context_vec) # optional projection
 
         return context_vec
+
+
+#__________________________________________________________________________
+# IMPLEMENTATION EXAMPLES
+
+torch.manual_seed(123)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"PyTorch version: {torch.__version__}")
+print(f"Running on {device}")
+
+batch_size = 8
+context_len = 1024
+embed_dim = 768
+embeddings = torch.randn((batch_size, context_len, embed_dim), device=device)
+
+# 1. MHA Wrapper
+mha_wrapper = MultiHeadAttentionWrapper(
+    d_in=embed_dim,
+    d_out=embed_dim//12,
+    context_length=context_len,
+    dropout=0.0,
+    num_heads=12,
+    qkv_bias=False
+).to(device)
+
+out_wrapper = mha_wrapper(embeddings)
+print(out.shape)
+
+# 2. MHA (Scaled-dot product)
+mha_scaled = MultiHeadAttention(
+    d_in=embed_dim,
+    d_out=embed_dim,
+    context_length=context_len,
+    dropout=0.0,
+    num_heads=12,
+    qkv_bias=False
+).to(device)
+
+out_scaled = mha_scaled(embeddings)
+print(out_scaled.shape)
+
