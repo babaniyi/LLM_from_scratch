@@ -13,6 +13,10 @@ def softmax(x):
     exp_x = np.exp(x - np.max(x, axis=-1, keepdims=True))
     return exp_x / np.sum(exp_x, axis=-1, keepdims=True)
   
+#__________________________________________________________________________
+#        Numpy IMPLEMENTATION
+# SelfAttention, CausalAttention, Multihead Attention
+#__________________________________________________________________________
 
 class SelfAttention_np():
 
@@ -63,8 +67,6 @@ class CausalAttention_np:
 
         context_vecs = np.matmul(attn_weights, values)
         return context_vecs
-
-
 
 class MultiHeadAttention_np:
     def __init__(self, d_in, d_out, context_length, dropout, num_heads, qkv_bias=False):
@@ -117,6 +119,37 @@ class MultiHeadAttention_np:
         # Combine heads, where self.d_out = self.num_heads * self.head_dim
         context_vec = np.transpose(context_vec, (0, 2, 1, 3)).reshape(b, num_tokens, self.d_out)
 
+        return context_vec
+        
+
+#__________________________________________________________________________
+#        PYTORCH IMPLEMENTATION
+#__________________________________________________________________________
+
+class CausalAttention(nn.Module):
+
+    def __init__(self, d_in, d_out, context_length, dropout, qkv_bias=False):
+        super().__init__()
+        self.d_out = d_out
+        self.W_query = nn.Linear(d_in, d_out, bias=qkv_bias)
+        self.W_key = nn.Linear(d_in, d_out, bias=qkv_bias)
+        self.W_value = nn.Linear(d_in, d_out, bias=qkv_bias)
+        self.dropout = nn.Dropout(dropout)  # New
+        self.register_buffer('mask', torch.triu(torch.ones(context_length, context_length), diagonal=1))  # New
+
+    def forward(self, x):
+        b, num_tokens, d_in = x.shape  # New batch dimension b
+        keys = self.W_key(x)
+        queries = self.W_query(x)
+        values = self.W_value(x)
+
+        attn_scores = queries @ keys.transpose(1, 2)  # Changed transpose
+        attn_scores.masked_fill_(  # New, _ ops are in-place
+            self.mask.bool()[:num_tokens, :num_tokens], -torch.inf)
+        attn_weights = torch.softmax(attn_scores / keys.shape[-1]**0.5, dim=-1)
+        attn_weights = self.dropout(attn_weights)  # New
+
+        context_vec = attn_weights @ values
         return context_vec
 
 
