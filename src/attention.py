@@ -12,7 +12,23 @@ np.random.seed(42)
 def softmax(x):
     exp_x = np.exp(x - np.max(x, axis=-1, keepdims=True))
     return exp_x / np.sum(exp_x, axis=-1, keepdims=True)
-  
+
+
+def cross_entropy(y_pred, y_true):
+ 
+    # computing softmax values for predicted values
+    #y_pred = softmax(y_pred)
+    loss = 0
+     
+    # Doing cross entropy Loss
+    for i in range(len(y_pred)):
+ 
+        # Here, the loss is computed using the
+        # above mathematical formulation.
+        loss = loss + (-1 * y_true[i]*np.log(y_pred[i]))
+ 
+    return loss
+ 
 #__________________________________________________________________________
 #        Numpy IMPLEMENTATION
 # SelfAttention, CausalAttention, Multihead Attention
